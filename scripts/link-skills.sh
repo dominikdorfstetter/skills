@@ -25,6 +25,7 @@ Options:
   --buckets <list>   Comma-separated buckets to install (e.g. engineering,personal)
   -y, --yes          Accept defaults (engineering, productivity, misc)
   --clean            Remove existing symlinks pointing into this repo before installing
+  -n, --dry-run      Show what would happen without touching the filesystem
   -h, --help         Show this help
 
 With no flags: prompts Y/n per bucket. Default Y for engineering, productivity,
@@ -36,6 +37,7 @@ EOF
 MODE=interactive
 SELECTION=""
 CLEAN=false
+DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,10 +45,14 @@ while [[ $# -gt 0 ]]; do
     --buckets) MODE=explicit; SELECTION="${2:-}"; shift 2;;
     -y|--yes) MODE=defaults; shift;;
     --clean) CLEAN=true; shift;;
+    -n|--dry-run) DRY_RUN=true; shift;;
     -h|--help) usage; exit 0;;
     *) echo "error: unknown option '$1'" >&2; usage; exit 2;;
   esac
 done
+
+# In dry-run, prefix all action lines so output is unambiguous
+if $DRY_RUN; then PREFIX="[dry-run] "; else PREFIX=""; fi
 
 # --- safety check ---
 # If ~/.claude/skills is a symlink that resolves into this repo, we'd end up
@@ -62,7 +68,11 @@ if [ -L "$DEST" ]; then
   esac
 fi
 
-mkdir -p "$DEST"
+if $DRY_RUN; then
+  [ -d "$DEST" ] || echo "${PREFIX}would create $DEST"
+else
+  mkdir -p "$DEST"
+fi
 
 # --- discover buckets ---
 BUCKETS=()
@@ -143,13 +153,17 @@ fi
 # --- clean stale symlinks pointing into this repo (if --clean) ---
 if $CLEAN; then
   echo
-  echo "Cleaning stale symlinks pointing into $REPO ..."
+  echo "${PREFIX}Cleaning stale symlinks pointing into $REPO ..."
   while IFS= read -r -d '' link; do
     target="$(readlink "$link" 2>/dev/null || true)"
     case "$target" in
       "$REPO"/*)
-        echo "  removed $(basename "$link")"
-        rm "$link"
+        if $DRY_RUN; then
+          echo "  ${PREFIX}would remove $(basename "$link")"
+        else
+          echo "  removed $(basename "$link")"
+          rm "$link"
+        fi
         ;;
     esac
   done < <(find "$DEST" -maxdepth 1 -type l -print0 2>/dev/null)
@@ -157,7 +171,7 @@ fi
 
 # --- link selected ---
 echo
-echo "Installing: ${SELECTED[*]}"
+echo "${PREFIX}Installing: ${SELECTED[*]}"
 echo "Destination: $DEST"
 echo
 for bucket in "${SELECTED[@]}"; do
@@ -167,6 +181,17 @@ for bucket in "${SELECTED[@]}"; do
     name="$(basename "$src")"
     target="$DEST/$name"
 
+    if $DRY_RUN; then
+      if [ -e "$target" ] && [ ! -L "$target" ]; then
+        printf "  %swould replace non-symlink %-25s with link to %s\n" "$PREFIX" "$name" "$bucket/$name"
+      elif [ -L "$target" ] && [ "$(readlink "$target" 2>/dev/null)" = "$src" ]; then
+        printf "  %sup-to-date %-30s (%s)\n" "$PREFIX" "$name" "$bucket"
+      else
+        printf "  %swould link %-30s (%s)\n" "$PREFIX" "$name" "$bucket"
+      fi
+      continue
+    fi
+
     if [ -e "$target" ] && [ ! -L "$target" ]; then
       rm -rf "$target"
     fi
@@ -175,3 +200,8 @@ for bucket in "${SELECTED[@]}"; do
     printf "  linked %-35s (%s)\n" "$name" "$bucket"
   done < <(find "$bucket_dir" -name SKILL.md -not -path '*/node_modules/*' -print0)
 done
+
+if $DRY_RUN; then
+  echo
+  echo "[dry-run] No changes made. Re-run without --dry-run to apply."
+fi

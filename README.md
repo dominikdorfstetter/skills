@@ -21,6 +21,7 @@ Non-interactive options:
 ./scripts/link-skills.sh --all                      # everything, including personal
 ./scripts/link-skills.sh --buckets engineering,personal
 ./scripts/link-skills.sh --clean --yes              # wipe stale symlinks pointing into this repo first
+./scripts/link-skills.sh --dry-run --all            # preview what would change without touching the filesystem
 ./scripts/link-skills.sh --help
 ```
 
