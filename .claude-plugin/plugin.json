@@ -6,10 +6,25 @@
     "./skills/engineering/architect-review",
     "./skills/engineering/bug-report",
     "./skills/engineering/coding-principles",
+    "./skills/engineering/diagnose",
     "./skills/engineering/feature-pm",
+    "./skills/engineering/grill-with-docs",
+    "./skills/engineering/improve-codebase-architecture",
     "./skills/engineering/resolve-issue",
     "./skills/engineering/run-checks",
     "./skills/engineering/security-audit",
-    "./skills/engineering/write-component-tests"
+    "./skills/engineering/tdd",
+    "./skills/engineering/to-issues",
+    "./skills/engineering/to-prd",
+    "./skills/engineering/triage",
+    "./skills/engineering/write-component-tests",
+    "./skills/engineering/zoom-out",
+    "./skills/productivity/caveman",
+    "./skills/productivity/grill-me",
+    "./skills/productivity/write-a-skill",
+    "./skills/misc/git-guardrails-claude-code",
+    "./skills/misc/migrate-to-shoehorn",
+    "./skills/misc/scaffold-exercises",
+    "./skills/misc/setup-pre-commit"
   ]
 }

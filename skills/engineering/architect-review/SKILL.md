@@ -1,6 +1,6 @@
 ---
 name: architect-review
-description: Architectural evaluation of a codebase. Finds tech debt, missing patterns, coverage gaps, and design inconsistencies, then files structured GitHub issues. Use when user asks for an architecture review, codebase evaluation, or wants to know what to fix structurally.
+description: Architectural evaluation of a codebase. Finds tech debt, missing patterns, coverage gaps, design inconsistencies; files parent + sub-issues via `gh`. Use when user asks for an architecture review, codebase evaluation, or wants to know what to fix structurally.
 ---
 
 # Architect Review
@@ -13,75 +13,75 @@ Systematic architecture review. Produces issues, not just observations.
 /architect-review              # full
 /architect-review --backend
 /architect-review --frontend
-/architect-review --api        # API contract only
+/architect-review --api        # contract only
 /architect-review --testing    # coverage and quality
 /architect-review --security   # auth, guards, validation
 ```
 
-Run all phases if no flag is given. Skip irrelevant phases for scoped runs.
+No flag → all phases. Skip irrelevant phases for scoped runs.
 
 ## Phase 1 — Backend
 
 For each handler/controller:
-- Auth: every mutation has an explicit role/permission check; tenant filter present on every data query.
-- Errors: no `unwrap`/`!` in handler or service code; consistent error response shape; correct HTTP status per error variant; no raw 500s for client errors.
-- Layering: queries live in models/repos, not inline in handlers; handlers stay thin.
-- Pagination: list endpoints have a `find_filtered` + `count_filtered` pair (or equivalent) and return a consistent paginated shape.
-- API spec: every public endpoint registered in OpenAPI/spec doc.
-- Migrations: additive only; foreign keys indexed; `ON DELETE` semantics intentional; case-insensitive columns where needed (slugs, emails).
 
-Flag every violation as a candidate issue.
+- **Auth** — every mutation has an explicit role check; tenant filter on every data query.
+- **Errors** — no `unwrap`/panic in handler/service code; consistent error shape; correct HTTP status per variant; no raw 500s for client errors.
+- **Layering** — queries in models/repos, not inline in handlers; handlers stay thin.
+- **Pagination** — list endpoints have `find_filtered` + `count_filtered` (or equivalent); consistent paginated shape.
+- **API spec** — every public endpoint registered.
+- **Migrations** — additive only; FKs indexed; `ON DELETE` semantics intentional; case-insensitive columns where needed.
 
 ## Phase 2 — Frontend
 
 For each page/route:
-- Shared hooks used (list state, CRUD mutations, autosave) — not hand-rolled equivalents.
-- RBAC guards on write actions, mirroring backend roles (UI hides; backend enforces).
-- Loading / empty / error use shared components, not ad-hoc spinners or alerts.
-- Hooks: stable callbacks (`useCallback` deps correct), no stale closures, refs typed for the framework version.
 
-For types: every field in API types corresponds to a real backend DTO field; enum strings match backend serialization exactly; no leftover `any`.
+- **Shared hooks** used (list state, CRUD mutations, autosave) — not hand-rolled.
+- **RBAC** guards on write actions (UI hides; backend enforces).
+- **Loading / empty / error** use shared components, not ad-hoc spinners.
+- **Hooks** — stable callbacks, no stale closures, framework-version-correct refs.
 
-For coverage: every page/hook/non-trivial shared component has a test file. List untested ones — each is an issue candidate.
+For types: every field in API types corresponds to a real backend DTO field; enum strings match backend serialization; no leftover `any`.
 
-For accessibility (WCAG 2.1 AA): semantic HTML over `<div onClick>`; `aria-label` on icon-only buttons; keyboard navigation works; focus managed across state changes; non-color status indicators; `prefers-reduced-motion` respected.
+For coverage: every page/hook/non-trivial shared component has a test file. List untested ones.
 
-For i18n: no hardcoded user-visible strings in markup; locale files have identical key structure; spot-check translations for machine-translation drift.
+For accessibility (WCAG 2.1 AA): semantic HTML over `<div onClick>`; `aria-label` on icon-only buttons; keyboard navigation; focus managed across state changes; non-color status indicators; `prefers-reduced-motion` respected.
+
+For i18n: no hardcoded user-visible strings; locale files share key structure; spot-check translations for drift.
 
 ## Phase 3 — API contract
 
 - Every backend endpoint the frontend calls has a typed client method.
-- Every typed client method's return matches the API types.
+- Every client method's return matches the API types.
 - Every client method is mocked in test setup.
 - OpenAPI/spec registers all endpoints and DTOs.
 
-Flag mismatches — these become silent runtime bugs.
+Mismatches become silent runtime bugs — flag them.
 
 ## Phase 4 — Cross-cutting
 
 | Concern | Check |
 |---|---|
-| Auth | Identity provider → backend chain consistent across endpoints |
-| Caching | Query keys namespaced per tenant; no cross-tenant cache leaks |
+| Auth | Identity provider → backend chain consistent |
+| Caching | Query keys namespaced per tenant |
 | Pagination | Server-side; no large client-side filtering |
 | i18n | All user-visible strings keyed |
 | Migrations | Additive; destructive flagged |
-| Rate limiting | Applied at the right layer to public + auth endpoints |
-| Error codes | Every failure path has a stable code, mapped to a user message |
+| Rate limiting | Right layer for public + auth endpoints |
+| Error codes | Every failure path has a stable code mapped to a user message |
 
-## Phase 5 — File parent + sub-issues with `gh`
+## Phase 5 — File via `gh`
 
-For each finding, decide:
+For each finding:
 
-- **Skip** if already in an open issue (`gh issue list --search "<keywords>"`) or if it belongs in a PR comment.
-- **File** if it's a pattern gap across multiple files, missing test on meaningful behavior, security/correctness concern, or design inconsistency that compounds over time.
+- **Skip** if already filed (`gh issue list --search "<keywords>"`) or PR-comment-sized.
+- **File** if it's a pattern gap, missing test on meaningful behavior, security/correctness concern, or design inconsistency that compounds.
 
-When findings cluster into a theme (e.g. "handler-pattern violations across backend"), file a **parent epic** + one **sub-issue per file or per coherent fix** so the work can be parallelized and tracked.
+Cluster findings into a theme → **parent epic + one sub per file or coherent fix**.
 
-**Parent epic**
+**Parent:**
 
 ```bash
-gh issue create \
+PARENT=$(gh issue create \
   --title "<theme of findings>" \
   --label "<type>,<area>,<phase>,epic" \
   --body "$(cat <<'EOF'
@@ -94,25 +94,25 @@ gh issue create \
 
 ## Acceptance Criteria (overall)
 - [ ] Every sub closed
-- [ ] No regressions in related features
+- [ ] No regressions
 
 ## Test Strategy (overall)
 | Category | Scenario | Outcome |
 |---|---|---|
-| Tracer bullet | One test that proves the new pattern works on the canonical example | Observable behavior |
-| Regression | Existing functionality continues to pass | All green |
+| Tracer bullet | Test that proves the new pattern on the canonical example | Observable |
+| Regression | Existing functionality passes | Green |
 EOF
-)"
+)" --json number --jq .number)
 ```
 
-**Sub-issue**
+**Each sub:**
 
 ```bash
 gh issue create \
   --title "<concise — what is missing or wrong>" \
   --label "<type>,<area>,<phase>" \
   --body "$(cat <<EOF
-Parent: #<parent>
+Parent: #${PARENT}
 
 ## Summary
 <the specific gap>
@@ -131,10 +131,10 @@ Parent: #<parent>
 ## Test Strategy
 | Category | Scenario | Outcome |
 |---|---|---|
-| Tracer bullet | <one test that fails today and passes after the change> | Observable |
-| Regression | <existing behavior still works> | Green |
+| Tracer bullet | <test that fails today, passes after change> | Observable |
+| Regression | <existing behavior> | Green |
 
-Implementation must follow Pocock-style TDD: failing test first, minimal fix, refactor green.
+Fix per Pocock-style TDD: failing test first, minimal change, refactor green.
 
 ## Files Affected
 - path — what changes
@@ -142,16 +142,16 @@ EOF
 )"
 ```
 
-After all subs are filed, edit the parent to replace `#TBD` placeholders with real numbers.
+After all subs are filed, rewrite the parent body replacing `#TBD` with real numbers.
 
-Labels: `bug` for incorrect behavior, `enhancement` for improvements, plus area labels (`backend`, `admin`, `a11y`, `security`, `i18n`, …) and a phase label if the project uses one (`phase:1` for foundational, `phase:2` for progressive).
+Labels: `bug` for incorrect behavior, `enhancement` for improvements; plus area (`backend`, `admin`, `a11y`, `security`, `i18n`); phase if the project uses one.
 
 ## Phase 6 — Report
 
 ```
 ## Findings by layer
 - Backend: N — <titles>
-- Frontend: N — <titles>
+- Frontend: N
 - API contract: N
 - Cross-cutting: N
 

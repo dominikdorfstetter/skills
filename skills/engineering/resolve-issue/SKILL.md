@@ -1,30 +1,22 @@
 ---
 name: resolve-issue
-description: End-to-end issue resolver. Reads a GitHub issue via gh, classifies the work, gates on requirements, implements with TDD using Pocock-style vertical slices, verifies, and commits. Use when given an issue number or URL to fix.
+description: End-to-end issue resolver. Reads a GitHub issue via `gh`, classifies the work, gates on requirements, implements TDD-first via Pocock vertical slices, verifies, commits. Use when given an issue number or URL to fix.
 ---
 
 # Resolve Issue
 
-Orchestrates: `gh issue view` → analysis → TDD implementation → verification → commit.
+`gh issue view` → analysis → TDD → verification → commit.
 
-**Coding principles** (always active): see `coding-principles` skill.
-**TDD discipline** (always active): see Pocock's `tdd` skill — one test → minimal impl → repeat. **Never horizontal slicing.**
+**Coding principles**: see `coding-principles` skill.
+**TDD discipline**: see `tdd` skill — one test → minimal impl → repeat. Never horizontal.
 
 ## Phase 1 — Load
 
 ```bash
-gh issue view <NUMBER> --json number,title,body,labels,assignees,state,comments
-gh issue view <NUMBER> --comments   # full discussion
+gh issue view <N> --comments
 ```
 
-If the issue has a parent, also load it:
-
-```bash
-# Parent reference is in the body — "Parent: #N"
-gh issue view <PARENT> --json title,body,labels
-```
-
-Extract: title + body, labels, comment clarifications, parent context, sibling sub-issues, linked PRs. If no number was given, ask for it.
+If the body has `Parent: #M`, also `gh issue view <M>` for context. Extract: title, body, labels, comments, parent, sibling subs, linked PRs. If no number was given, ask.
 
 ## Phase 2 — Classify
 
@@ -33,127 +25,99 @@ Extract: title + body, labels, comment clarifications, parent context, sibling s
 | `backend` label / handler/model/migration mentioned | `backend-only` |
 | `frontend` label / page/component/hook | `frontend-only` |
 | Both, or new API + new UI | `full-stack` |
-| `bug` label | TDD mandatory (test reproduces the bug) |
-| `enhancement` / `feature` | TDD mandatory (test demonstrates the new behavior) |
-| `docs` / config-only | TDD not required (no behavior change) |
+| `bug` | TDD mandatory (test reproduces the bug) |
+| `enhancement` / `feature` | TDD mandatory (test demonstrates new behavior) |
+| `docs` / config-only | TDD not required |
 
-**TDD is mandatory for any change that introduces or modifies behavior.** Pure docs / formatting / config-only is the only exemption. State the classification and reasoning before continuing.
+**TDD is mandatory for any behavior change.** Pure docs / formatting / config-only is the only exemption. State the classification and reasoning out loud.
 
 ## Phase 3 — Requirement gate (HARD)
 
-Do not proceed if the issue fails any check.
+Don't proceed if any check fails.
 
-**Freshness** — Compare issue creation date to recent commits in the affected dirs (`git log --since=<date>`).
-
+**Freshness** — `git log --since=<issue date>` in affected dirs.
 - Already implemented → `gh issue close <N> --reason "not planned" --comment "<why>"`, stop.
-- Stale but salvageable → update body in-place with `gh issue edit`, continue.
-- Area has grown → flag missing considerations, ask whether to extend scope.
+- Stale but salvageable → `gh issue edit` in-place, continue.
+- Area has grown → flag and ask whether to extend scope.
 
-**Completeness checklist**
+**Completeness**
 
-| Section | When required | If missing |
+| Section | When | If missing |
 |---|---|---|
 | Acceptance Criteria | Always | Ask user for definition of done |
-| Access Control matrix | If feature has actions | Auto-generate from role model, confirm |
-| Error Cases table | If feature can fail | Auto-generate from handler/DTO, confirm |
-| Test Strategy table | Always | Auto-generate, confirm — name the tracer-bullet test |
-| Tracer-bullet test | Always (TDD) | Define the single test that proves the path works |
-| i18n keys | If user-visible strings | Propose keys from existing namespace |
-| Accessibility notes | If new UI elements | Add per component type |
+| Access Control | If feature has actions | Auto-generate from role model, confirm |
+| Error Cases | If feature can fail | Auto-generate from handler/DTO, confirm |
+| Test Strategy + tracer bullet | Always | Auto-generate, confirm — name the tracer-bullet test |
+| i18n keys | If user-visible strings | Propose from existing namespace |
+| Accessibility notes | If new UI | Add per component type |
 
-For each missing section: fill from codebase analysis (and confirm) or ask one specific question. Once filled:
+Fill from codebase analysis (and confirm) or ask one specific question. Patch with `gh issue edit <N> --body "..."` once filled.
 
-```bash
-gh issue edit <N> --body "$(cat <<'EOF'
-<updated body>
-EOF
-)"
-```
-
-If user explicitly says "skip the gate", note "issue incomplete, implemented per user request" in the commit and still flag what's missing.
+If the user says "skip the gate", note "issue incomplete, implemented per user request" in the commit and still flag what's missing.
 
 ## Phase 4 — Codebase analysis
 
 Read only what's relevant.
 
-- **Backend** — handler, model, DTO, existing tests, latest migration (for numbering).
-- **Frontend** — page/component, affected hooks, API client method, types, existing tests.
-- **Full-stack** — both. Identify the contract boundary.
+- **Backend**: handler, model, DTO, tests, latest migration.
+- **Frontend**: page/component, hooks, API client, types, tests.
+- **Full-stack**: both, plus the contract boundary.
 
-Produce: root cause (bugs) or gap analysis (features), file-by-file change list (create/modify/delete), risk areas, **the list of behaviors to test in vertical-slice order** (tracer bullet first, then incremental).
+Produce: root cause (bugs) or gap analysis (features); file-by-file change list (create/modify/delete); risk areas; **the test list in vertical-slice order** (tracer bullet first, then incremental).
 
 ## Phase 5 — TDD plan
 
-Mandatory. State the test list before writing any code:
+State before writing code:
 
-1. **Tracer bullet** — one end-to-end test that proves the whole path works (e.g. for an endpoint: request goes in, correct response comes out, side effect happened).
-2. **Incremental tests** — ordered list of behaviors to add, each with one test.
+1. **Tracer bullet** — one E2E that proves the whole path works.
+2. **Incremental tests** — ordered list, each adding one behavior.
 
-Each test must:
-
-- Describe behavior, not implementation.
-- Use the public interface (HTTP, hook return, exported API), not internals.
-- Survive an internal refactor.
-
-If the user has scoped opinions ("skip the X test, we don't care about that path"), respect them and note in the commit.
+Each test describes behavior, uses the public interface, would survive a refactor. If the user scopes opinions ("skip path X"), respect and note in the commit.
 
 ## Phase 6 — Implementation (red → green → refactor)
 
-For each test in the Phase 5 list, in order:
+Per test in order:
 
-**RED** — Write the test at the right seam. Run it. Confirm it fails for the **right reason** (not a compile error, not a mock setup error, not the wrong assertion).
-
-**GREEN** — Write the minimal code to pass. No speculative abstractions. No "while I'm here" cleanup. Run the test. Confirm green.
-
-**REFACTOR** — Only while green. Extract duplication, deepen modules, apply SOLID where natural. Re-run after every refactor step. Never refactor with a failing test.
+- **RED** — write at the right seam; run; confirm it fails for the **right reason** (not compile error, not mock setup).
+- **GREEN** — minimal code to pass. No speculative abstractions, no "while I'm here" cleanup.
+- **REFACTOR** — only while green. Extract duplication, deepen modules, apply SOLID where natural; re-run after each step.
 
 Move to the next test only when the current cycle is fully green.
 
-Route to project-specific scaffolders for boilerplate (e.g. `add-backend-endpoint`, `add-admin-list-page`, `write-admin-tests`) — but keep the test-first cadence regardless.
+Route to scaffolders for boilerplate (`add-backend-endpoint`, `add-list-page`, `write-component-tests`) — keep the test-first cadence regardless.
 
 ## Phase 7 — Verification gate (HARD)
 
-Three parts. All must pass.
+Three parts, all must pass. Show actual output — no summarizing.
 
-**A. Full test suite** — Run the project's full check script regardless of scope. Show actual output. No summarizing.
-
-**B. Frontend health (if any UI files changed)** — Run the project's frontend health check. Score must meet threshold. Skip with a note if backend-only.
-
-**C. Documentation** — For features and meaningful bug fixes:
-
-- Docs site — new endpoint / page / config / changed behavior → update before committing.
-- README — new major feature, new dev workflow, changed prerequisites → update.
-- Changelog — feature or non-trivial fix → add entry.
-
-State each as: `PASSED` / `SKIPPED (reason)` / `UPDATED` / `NOT NEEDED (reason)`.
+- **A. Full test suite** — Run the project's check script regardless of scope.
+- **B. Frontend health** (if UI files changed) — Run the project's check (e.g. React Doctor); score must meet threshold. Skip if backend-only.
+- **C. Documentation** — For features and meaningful fixes: docs site (new endpoint / page / config / behavior change), README (major feature / dev workflow / prerequisites), changelog. State each: `PASSED` / `SKIPPED (reason)` / `UPDATED` / `NOT NEEDED (reason)`.
 
 ## Phase 8 — Self-review
 
 ```
-□ Every acceptance criterion addressed?
+□ Every AC addressed?
 □ Edge cases from comments handled?
-□ TDD followed: every behavior has a test written before its implementation?
-□ Tests test behavior through public interfaces, not internals?
-□ No new unwrap/!/panic in production code paths
-□ No over-engineering — only what the issue asks for
+□ TDD followed — every behavior tested before its implementation?
+□ Tests use public interfaces, not internals?
+□ No new unwrap/panic in production code paths
+□ Only what the issue asks for — no over-engineering
 □ No files modified beyond Phase 4 scope
 ```
 
-If gaps, fix and re-verify (re-run Phase 7 if any code changed).
+If gaps, fix and re-run Phase 7.
 
 ## Phase 9 — Commit & link
 
-**Always create a feature branch.** Never commit directly to `main`.
+Always create a feature branch. Never commit directly to `main`.
 
 ```bash
-git checkout -b fix/<short-description>   # bug
-git checkout -b feat/<short-description>  # feature
+git checkout -b fix/<short>   # bug
+git checkout -b feat/<short>  # feature
 ```
 
-If you already committed to `main`:
-1. `git checkout -b <branch>` from current HEAD
-2. `git branch -f main origin/main`
-3. Continue from the feature branch.
+If you already committed to `main`: `git checkout -b <branch>`, then `git branch -f main origin/main`, continue from the branch.
 
 Stage specific files (never `git add -A`):
 
@@ -168,20 +132,20 @@ EOF
 )"
 ```
 
-Types: `fix`, `feat`, `refactor`, `test`, `docs`, `chore`.
+Types: `fix`, `feat`, `refactor`, `test`, `docs`, `chore`. Never include AI attribution.
 
-If this issue has a parent, **comment on the parent** to update progress:
+If this issue has a parent, update it:
 
 ```bash
-gh issue comment <PARENT> --body "Closed sub-issue #<N>: <summary>. Remaining: <list>."
+gh issue comment <PARENT> --body "Closed sub #<N>: <summary>. Remaining: <list>."
 ```
 
-Do not push or open a PR unless explicitly asked.
+Don't push or open a PR unless explicitly asked.
 
 ## Abort if
 
-- Issue is ambiguous about what "done" means.
+- Issue is ambiguous about "done".
 - Change touches shared infrastructure (auth, schema, core services) in a way that affects many endpoints.
-- Migration needed — confirm migration content first.
-- Tests fail for reasons unrelated to the issue.
-- A test cannot be written at the right seam (the architecture is preventing the bug from being locked down) — flag this and consult `/improve-codebase-architecture`.
+- Migration needed — confirm content first.
+- Tests fail for unrelated reasons.
+- No correct seam exists for the test — that itself is the finding (consult `/improve-codebase-architecture`).
