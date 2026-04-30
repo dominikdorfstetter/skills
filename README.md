@@ -27,6 +27,34 @@ Non-interactive options:
 
 Add a new bucket: drop a `SKILL.md` under `skills/<bucket>/<skill-name>/` and rerun the installer — it'll show up in the prompt automatically.
 
+### Run from anywhere — `setup-skills` shell command (zsh / bash)
+
+For a `setup-skills` command available in any directory, append this to `~/.zshrc` (or `~/.bashrc`):
+
+```sh
+# >>> dominiks-skills installer (managed) >>>
+setup-skills() {
+  local script="$HOME/repos/skills/dominiks-skills/scripts/link-skills.sh"
+  if [[ ! -x "$script" ]]; then
+    echo "setup-skills: installer not found at $script" >&2
+    return 1
+  fi
+  "$script" "$@"
+}
+# <<< dominiks-skills installer (managed) <<<
+```
+
+Reload (`source ~/.zshrc`) or open a new shell, then:
+
+```bash
+setup-skills                  # interactive
+setup-skills --yes
+setup-skills --dry-run --all
+setup-skills --buckets engineering,personal
+```
+
+Adjust the `$HOME/repos/skills/dominiks-skills/...` path if you cloned the repo elsewhere.
+
 ## Conventions
 
 Issue-producing skills (`bug-report`, `feature-pm`, `architect-review`, `security-audit`, `resolve-issue`, `to-issues`, `to-prd`, `triage`, `improve-codebase-architecture`) follow a consistent contract:
