@@ -12,7 +12,19 @@ cd skills
 ./scripts/link-skills.sh
 ```
 
-Symlinks every skill in `engineering/`, `productivity/`, and `misc/` into `~/.claude/skills/`. Skills in `personal/` and `deprecated/` are not promoted.
+The installer discovers every bucket under `skills/` that contains at least one `SKILL.md` and asks Y/n per bucket. Defaults: `engineering`, `productivity`, `misc` are Y by default; `personal`, `deprecated`, and any new bucket (e.g. a future `managerial/`) are N by default.
+
+Non-interactive options:
+
+```bash
+./scripts/link-skills.sh --yes                      # accept defaults (engineering, productivity, misc)
+./scripts/link-skills.sh --all                      # everything, including personal
+./scripts/link-skills.sh --buckets engineering,personal
+./scripts/link-skills.sh --clean --yes              # wipe stale symlinks pointing into this repo first
+./scripts/link-skills.sh --help
+```
+
+Add a new bucket: drop a `SKILL.md` under `skills/<bucket>/<skill-name>/` and rerun the installer — it'll show up in the prompt automatically.
 
 ## Conventions
 
