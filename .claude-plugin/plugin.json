@@ -1,0 +1,15 @@
+{
+  "name": "dominiks-skills",
+  "skills": [
+    "./skills/engineering/add-backend-endpoint",
+    "./skills/engineering/add-list-page",
+    "./skills/engineering/architect-review",
+    "./skills/engineering/bug-report",
+    "./skills/engineering/coding-principles",
+    "./skills/engineering/feature-pm",
+    "./skills/engineering/resolve-issue",
+    "./skills/engineering/run-checks",
+    "./skills/engineering/security-audit",
+    "./skills/engineering/write-component-tests"
+  ]
+}
