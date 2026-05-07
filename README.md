@@ -1,6 +1,6 @@
 # Dominik's Skills
 
-My personal Claude Code skills, organized in a Pocock-style bucket layout. **One installer covers everything** — both my originals and the upstream Pocock skills, all aligned to my conventions (gh-only issues, parent + sub-issue decomposition, mandatory Test Strategy, Pocock-style TDD).
+My personal coding-agent skills, organized in a Pocock-style bucket layout. **One installer, any harness** — Claude Code, Pi, Codex, Gemini CLI, Cursor, and the shared `~/.agents/skills/` location. Both my originals and the upstream Pocock skills, all aligned to my conventions (gh-only issues, parent + sub-issue decomposition, mandatory Test Strategy, Pocock-style TDD).
 
 Adapted from Matt Pocock's [`mattpocock/skills`](https://github.com/mattpocock/skills) — the structure, several skills, and the TDD discipline are his.
 
@@ -9,23 +9,42 @@ Adapted from Matt Pocock's [`mattpocock/skills`](https://github.com/mattpocock/s
 ```bash
 git clone https://github.com/dominikdorfstetter/skills.git
 cd skills
-./scripts/link-skills.sh
+./scripts/install.sh
 ```
 
-The installer discovers every bucket under `skills/` that contains at least one `SKILL.md` and asks Y/n per bucket. Defaults: `engineering`, `productivity`, `misc` are Y by default; `personal`, `deprecated`, and any new bucket (e.g. a future `managerial/`) are N by default.
+The installer walks you through two steps:
+1. **Select harness(es)** — Claude Code, Pi, Codex, Gemini CLI, Cursor, or the shared `~/.agents/skills/` location. Pick as many as you want.
+2. **Select buckets** — which skill categories to install. Defaults: `engineering`, `productivity`, `misc` are Y; `personal`, `deprecated`, and new buckets are N.
 
-Non-interactive options:
+Each bucket is discovered automatically — anything under `skills/` with at least one `SKILL.md` shows up.
+
+### Non-interactive (CI / scripting)
 
 ```bash
-./scripts/link-skills.sh --yes                      # accept defaults (engineering, productivity, misc)
-./scripts/link-skills.sh --all                      # everything, including personal
-./scripts/link-skills.sh --buckets engineering,personal
-./scripts/link-skills.sh --clean --yes              # wipe stale symlinks pointing into this repo first
-./scripts/link-skills.sh --dry-run --all            # preview what would change without touching the filesystem
-./scripts/link-skills.sh --help
+# Install default buckets into Claude Code only (same as old link-skills.sh --yes)
+./scripts/install.sh --harness claude --yes
+
+# Everything, every harness
+./scripts/install.sh --harness all --all
+
+# Specific harnesses, specific buckets
+./scripts/install.sh --harness claude,pi --buckets engineering,productivity
+
+# Shared location only, default buckets
+./scripts/install.sh --harness agents --yes
+
+# Preview
+./scripts/install.sh --harness all --all --dry-run
+
+# Clean stale symlinks first
+./scripts/install.sh --harness claude --clean --yes
+
+./scripts/install.sh --help
 ```
 
-Add a new bucket: drop a `SKILL.md` under `skills/<bucket>/<skill-name>/` and rerun the installer — it'll show up in the prompt automatically.
+### Backward compatibility
+
+`./scripts/link-skills.sh` still works — it's a thin wrapper that calls `install.sh --harness claude` with the same flags as before.
 
 ### Run from anywhere — `setup-skills` shell command (zsh / bash)
 
@@ -34,7 +53,7 @@ For a `setup-skills` command available in any directory, append this to `~/.zshr
 ```sh
 # >>> dominiks-skills installer (managed) >>>
 setup-skills() {
-  local script="$HOME/repos/skills/dominiks-skills/scripts/link-skills.sh"
+  local script="$HOME/repos/skills/dominiks-skills/scripts/install.sh"
   if [[ ! -x "$script" ]]; then
     echo "setup-skills: installer not found at $script" >&2
     return 1
@@ -47,10 +66,11 @@ setup-skills() {
 Reload (`source ~/.zshrc`) or open a new shell, then:
 
 ```bash
-setup-skills                  # interactive
-setup-skills --yes
-setup-skills --dry-run --all
-setup-skills --buckets engineering,personal
+setup-skills                         # interactive (buckets + harnesses)
+setup-skills --harness claude --yes  # Claude-only, default buckets
+setup-skills --harness all --all     # everything everywhere
+setup-skills --dry-run --all --harness all
+setup-skills --buckets engineering,personal --harness claude,pi
 ```
 
 Adjust the `$HOME/repos/skills/dominiks-skills/...` path if you cloned the repo elsewhere.
@@ -111,7 +131,8 @@ skills/
   personal/       tied to my own setup; not promoted
   deprecated/     no longer used
 scripts/
-  link-skills.sh  symlinks engineering/productivity/misc into ~/.claude/skills
+  install.sh       harness-agnostic installer (Claude Code, Pi, Codex, Gemini CLI, Cursor, shared)
+  link-skills.sh   backward-compat wrapper → install.sh --harness claude
 .claude-plugin/
   plugin.json     promoted skills
 CLAUDE.md         repo conventions
